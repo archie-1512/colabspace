@@ -1,0 +1,13 @@
+tester_id,platform,rating,category,comment
+T001,Android,4,Maps,"Map loads slowly on 4G, takes about 6 seconds"
+T002,iOS,5,Booking,"Booking flow is really smooth, loved the 3-step checkout"
+T003,Android,2,Crash,"App crashes on Android 12 when I open the map from a trip card"
+T004,Android,3,Search,"Search for Munnar returned Mumbai results first"
+T005,iOS,4,Notifications,"Didn't get a reminder the day before my trip"
+T006,Android,1,Crash,"Crash on Android 12, Samsung M31, every time I tap View on map"
+T007,Android,4,Payments,"Wanted UPI option, only cards were shown"
+T008,iOS,5,Onboarding,"Onboarding was quick, didn't feel like signing up"
+T009,Android,3,Search,"Typing Kochi vs Cochin gives different results"
+T010,Android,2,Payments,"Payment failed twice with a generic error, had to retry"
+T011,iOS,4,Maps,"Would like offline maps for hill stations with bad network"
+T012,Android,2,Crash,"Map screen crash again on Android 12 (Redmi Note 10)"

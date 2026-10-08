@@ -1,0 +1,18 @@
+TripTrail API - rate limits and quotas (internal reference)
+
+Public endpoints
+  GET /search            100 requests per minute per user, 20 per minute when logged out
+  GET /trips/:id         300 requests per minute per user
+  POST /bookings         10 requests per minute per user
+
+Third-party quotas
+  Google Maps Places API: 100,000 requests per month on the current plan.
+  We used 71,400 in September. At launch traffic we will likely exceed the quota in the
+  third week of November, so Dev is adding a 24-hour cache for place lookups.
+
+  Firebase Cloud Messaging: no hard limit, but iOS delivery needs the APNs key uploaded
+  to Firebase. Only the founder's Apple developer account can create that key.
+
+Load test results (k6, 1 October)
+  /search at 500 rps: p95 = 1.8 s (target < 800 ms). Likely cause: missing index on trips.city.
+  /bookings at 50 rps: p95 = 420 ms (OK).

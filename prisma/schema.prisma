@@ -1,0 +1,199 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum InviteType {
+  EMAIL
+  LINK
+}
+
+enum Status {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum AccessLevel {
+  ADMIN_ONLY
+  ALL_MEMBERS
+}
+
+enum CardVisibility {
+  ALL_MEMBERS
+  ASSIGNED_ONLY
+}
+
+model User {
+  id              String            @id @default(cuid())
+  name            String
+  email           String            @unique
+  passwordHash    String
+  createdAt       DateTime          @default(now())
+  memberships     WorkspaceMember[]
+  ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
+  sentInvites     Invite[]
+  cardAssignments CardAssignee[]
+  uploadedFiles   CardFile[]
+  addedLinks      CardLink[]
+  sentMessages     Message[]        @relation("MessageSender")
+  receivedMessages Message[]        @relation("MessageReceiver")
+}
+
+model Workspace {
+  id                   String         @id @default(cuid())
+  name                 String
+  description          String         @default("")
+  inviteAccess         AccessLevel    @default(ADMIN_ONLY)
+  cardVisibility       CardVisibility @default(ALL_MEMBERS)
+  memberCanCreateCards Boolean        @default(true)
+  cardEditAccess       AccessLevel    @default(ALL_MEMBERS)
+  ownerId              String
+  owner                User           @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  members              WorkspaceMember[]
+  boards               Board[]
+  invites              Invite[]
+  createdAt            DateTime       @default(now())
+}
+
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        Role      @default(MEMBER)
+  user        User      @relation(fields: [userId], references: [id])
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@unique([userId, workspaceId])
+}
+
+model Invite {
+  id          String       @id @default(cuid())
+  email       String?
+  token       String       @unique
+  role        Role         @default(MEMBER)
+  type        InviteType   @default(EMAIL)
+  status      InviteStatus @default(PENDING)
+  workspaceId String
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id])
+  invitedById String
+  invitedBy   User         @relation(fields: [invitedById], references: [id])
+  expiresAt   DateTime
+  createdAt   DateTime     @default(now())
+}
+
+model Board {
+  id                   String         @id @default(cuid())
+  title                String
+  description          String         @default("")
+  visibility           CardVisibility @default(ALL_MEMBERS)
+  memberCanCreateCards Boolean        @default(true)
+  workspaceId          String
+  workspace            Workspace      @relation(fields: [workspaceId], references: [id])
+  cards                Card[]
+  createdAt            DateTime       @default(now())
+}
+
+model Card {
+  id             String         @id @default(cuid())
+  title          String
+  content        String         @default("")
+  status         Status         @default(TODO)
+  position       Int            @default(0)
+  dueDate        DateTime?
+  trackDueDate   Boolean        @default(false)
+  enableFiles    Boolean        @default(false)
+  enableLinks    Boolean        @default(false)
+  visibility     CardVisibility @default(ALL_MEMBERS)
+  version        Int            @default(0)
+  boardId        String
+  board          Board          @relation(fields: [boardId], references: [id])
+  assignees      CardAssignee[]
+  files          CardFile[]
+  links          CardLink[]
+  updatedAt      DateTime       @updatedAt
+  createdAt      DateTime       @default(now())
+}
+
+model CardAssignee {
+  id     String @id @default(cuid())
+  cardId String
+  userId String
+  card   Card   @relation(fields: [cardId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([cardId, userId])
+}
+
+model CardFile {
+  id           String   @id @default(cuid())
+  cardId       String
+  card         Card     @relation(fields: [cardId], references: [id])
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  filename     String
+  storedName   String
+  mimeType     String
+  size         Int
+  createdAt    DateTime @default(now())
+}
+
+model CardLink {
+  id          String   @id @default(cuid())
+  cardId      String
+  card        Card     @relation(fields: [cardId], references: [id])
+  addedById   String
+  addedBy     User     @relation(fields: [addedById], references: [id])
+  label       String
+  url         String
+  createdAt   DateTime @default(now())
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  content    String
+  createdAt  DateTime @default(now())
+  sender     User     @relation("MessageSender", fields: [senderId], references: [id])
+  receiver   User     @relation("MessageReceiver", fields: [receiverId], references: [id])
+
+  @@index([senderId, receiverId])
+  @@index([receiverId, senderId])
+}
+
+// RAG index. One row per chunk of indexed content. Written and queried with raw
+// SQL (lib/rag/*) because Prisma can't read/write the pgvector column directly.
+// Deliberately stores no permission data: access is checked against live
+// Card/Board/Membership rows at query time, so it can never go stale.
+model Embedding {
+  id          String                      @id
+  workspaceId String? // null for DMs, which aren't tied to a workspace
+  sourceType  String // "card" | "file" | "dm"
+  sourceId    String // card id, file id, or "userA:userB" (sorted) for a DM thread
+  chunkIndex  Int                         @default(0)
+  content     String
+  embedding   Unsupported("vector(384)")?
+  updatedAt   DateTime                    @default(now())
+
+  @@unique([sourceType, sourceId, chunkIndex])
+  @@index([workspaceId, sourceType])
+}

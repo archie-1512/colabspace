@@ -1,0 +1,44 @@
+# Run the whole stack locally with one command:
+#   docker compose up --build
+# Then open http://localhost:3000. No .env needed; add LLM_API_KEY to a .env
+# file for written answers from the assistant.
+#
+# Demo data:  docker compose exec app npm run seed:demo
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: collabspace
+      POSTGRES_PASSWORD: collabspace
+      POSTGRES_DB: collabspace
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U collabspace"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # These override anything in .env so the app always talks to the db container.
+      DATABASE_URL: postgresql://collabspace:collabspace@db:5432/collabspace
+      DIRECT_URL: postgresql://collabspace:collabspace@db:5432/collabspace
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-local-docker-secret-change-me}
+      S3_BUCKET: ""
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  uploads:
