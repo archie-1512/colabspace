@@ -1,6 +1,7 @@
 # Build → push to ECR → deploy to EC2, on every push to main.
-# AWS access uses GitHub's OIDC token to assume an IAM role: no AWS keys are
-# stored in GitHub. Deployment runs through SSM, so no SSH port is open.
+# AWS access uses a dedicated IAM user whose keys are stored as encrypted
+# GitHub secrets; it can only push to one ECR repository and run the deploy
+# command on one instance. Deployment runs through SSM, so no SSH port is open.
 # Setup steps: DEPLOY.md, section 7.
 name: Deploy
 
@@ -10,7 +11,6 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write
   contents: read
 
 concurrency:
@@ -27,10 +27,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Log in to ECR
